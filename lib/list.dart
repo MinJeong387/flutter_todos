@@ -15,7 +15,8 @@ class ListPage extends StatelessWidget {
       body: Container(color: Colors.grey[100], child: _ListPage()),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          //  TODO: 작성 폼으로 이동
+          //  작성 폼으로 이동
+          Navigator.pushNamed(context, "/write");
         },
         child: Icon(Icons.add),
       ),
@@ -31,6 +32,8 @@ class _ListPage extends StatefulWidget {
 }
 
 class _ListPageState extends State<_ListPage> {
+  //  상수
+  static const String API_ENDPOINT = "http://54.180.89.36:18088/api/todos";
   //  상태 정의
   //  late : 선언시 할당하지 않고, 나중에 할당되는 변수
   late Future<List<TodoItemVo>> todoListFuture;
@@ -54,7 +57,7 @@ class _ListPageState extends State<_ListPage> {
     return FutureBuilder(
       future: todoListFuture, //  감시할 future 객체
       builder: (context, snapshot) {
-        print("snapshot: $snapshot");
+        // print("snapshot: $snapshot");
         //  상태 정보 체크
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
@@ -76,11 +79,17 @@ class _ListPageState extends State<_ListPage> {
                           : Colors.white,
                   leading: Checkbox(
                     value: snapshot.data![index].completed,
-                    onChanged: (bool? value) {
-                      // TODO: 서버로 완료 여부 전송(PUT)
-
+                    onChanged: (bool? value) async {
+                      // setState(() {
+                      //   snapshot.data![index].completed = value ?? false;
+                      // });
+                      //  전송할 데이터
+                      TodoItemVo item = snapshot.data![index];
+                      TodoItemVo updatedItem = await toggleTodoItemCompleted(
+                        item,
+                      );
                       setState(() {
-                        snapshot.data![index].completed = value ?? false;
+                        snapshot.data![index] = updatedItem;
                       });
                     },
                   ),
@@ -94,13 +103,21 @@ class _ListPageState extends State<_ListPage> {
                       IconButton(
                         icon: Icon(Icons.edit),
                         onPressed: () {
-                          // TODO: 수정 폼으로 이동
+                          //  TODO: 수정 폼으로 이동
                         },
                       ),
                       IconButton(
                         icon: Icon(Icons.delete),
-                        onPressed: () {
-                          // TODO: 수정 폼으로 이동, 서버로 DELETE api 호출
+                        onPressed: () async {
+                          //  삭제 요청 함수 호출
+                          int deletedId = await deleteTodoItem(
+                            snapshot.data![index].id,
+                          );
+                          setState(() {
+                            snapshot.data!.removeWhere(
+                              (element) => element.id == deletedId,
+                            );
+                          });
                         },
                       ),
                     ],
@@ -122,7 +139,7 @@ class _ListPageState extends State<_ListPage> {
       //  헤더 설정: 데이터를 json 형식으로 주고 받겠다는 약속
       dio.options.headers['Content-Type'] = "application/json";
       //  서버로 목록 요청
-      final response = await dio.get("http://15.164.218.25:18088/api/todos");
+      final response = await dio.get(API_ENDPOINT);
 
       //  응답
       if (response.statusCode == 200) {
@@ -148,6 +165,51 @@ class _ListPageState extends State<_ListPage> {
       }
     } catch (e) {
       throw Exception("할 일 목록을 불러오는데 실패했습니다: $e");
+    }
+  }
+
+  //  TodoItem의 completed 필드를 toggle하는 함수
+  Future<TodoItemVo> toggleTodoItemCompleted(TodoItemVo item) async {
+    try {
+      //  completed 필드 반전
+      item.completed = !item.completed;
+
+      var dio = Dio(); //  초기화
+      dio.options.headers['Content-Type'] = 'application/json';
+
+      //  데이터 갱산 : PUT
+      final response = await dio.put(
+        "$API_ENDPOINT/${item.id}",
+        data: item.toJson(),
+      );
+
+      if (response.statusCode == 200) {
+        print('TodoItem completed의 상태가 변경되었습니다.');
+        return TodoItemVo.fromJson(response.data);
+      } else {
+        throw Exception("API 서버 에러");
+      }
+    } catch (e) {
+      throw Exception("TodoItem 상태를 변경하는데 실패 했습니다: $e");
+    }
+  }
+
+  //  TodoItem을 삭제하는 함수
+  Future<int> deleteTodoItem(int id) async {
+    try {
+      var dio = Dio();
+      dio.options.headers['Content-Type'] = 'application/json';
+
+      //  서버로 DELETE 요청
+      final response = await dio.delete("$API_ENDPOINT/$id");
+
+      if (response.statusCode == 200) {
+        return id;
+      } else {
+        throw Exception("API 서버 오류");
+      }
+    } catch (e) {
+      throw Exception('TodoItem 삭제에 실패했습니다.: $e');
     }
   }
 }
