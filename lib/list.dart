@@ -103,7 +103,14 @@ class _ListPageState extends State<_ListPage> {
                       IconButton(
                         icon: Icon(Icons.edit),
                         onPressed: () {
-                          //  TODO: 수정 폼으로 이동
+                          // 수정 폼으로 이동
+                          Navigator.pushNamed(
+                            context,
+                            "/edit",
+                            arguments: {
+                              "id": snapshot.data![index].id,
+                            }, // 수정 페이지로 넘길 데이터 (map)
+                          );
                         },
                       ),
                       IconButton(
